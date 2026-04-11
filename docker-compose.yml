@@ -1,0 +1,94 @@
+networks:
+  meeting-network:
+    driver: bridge
+
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: meeting-postgres
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+          - ./db-init:/docker-entrypoint-initdb.d
+    networks:
+      - meeting-network
+
+
+  redis:
+    image: redis:7
+    container_name: meeting-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - meeting-network
+
+  kafka:
+    image: bitnamilegacy/kafka:latest
+    container_name: meeting-kafka
+    networks:
+      - meeting-network
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,PLAINTEXT_HOST://:29092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - ALLOW_PLAINTEXT_LISTENER=yes
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=
+    ports:
+      - "8090:8080"
+    networks:
+      - meeting-network
+
+  redis-insight:
+    image: redislabs/redisinsight:latest
+    container_name: redis-insight
+    ports:
+      - "8001:8001"
+    networks:
+      - meeting-network
+
+  kafka-init:
+    image: bitnamilegacy/kafka:latest
+    depends_on:
+      - kafka
+    networks:
+      - meeting-network
+    restart: "no"
+    entrypoint: [ "/bin/bash", "-c" ]
+    command: |
+      "
+      echo 'Waiting for Kafka...';
+      until /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list > /dev/null 2>&1; do
+        echo 'Kafka is not ready yet...';
+        sleep 2;
+      done;
+
+      echo 'Kafka is ready. Creating topics...';
+
+      /opt/bitnami/kafka/bin/kafka-topics.sh --create --if-not-exists --topic user-service.user-created --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1;
+      /opt/bitnami/kafka/bin/kafka-topics.sh --create --if-not-exists --topic user-service.user-updated --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1;
+      /opt/bitnami/kafka/bin/kafka-topics.sh --create --if-not-exists --topic user-service.user-deleted --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1;
+      /opt/bitnami/kafka/bin/kafka-topics.sh --create --if-not-exists --topic user-service.user-status-changed --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1;
+
+      echo 'All topics created successfully';
+      "
