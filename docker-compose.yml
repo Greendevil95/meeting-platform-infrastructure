@@ -1,5 +1,6 @@
 networks:
   meeting-network:
+    name: meeting-network
     driver: bridge
 
 services:
@@ -66,29 +67,3 @@ services:
       - "8001:8001"
     networks:
       - meeting-network
-
-  kafka-init:
-    image: bitnamilegacy/kafka:latest
-    depends_on:
-      - kafka
-    networks:
-      - meeting-network
-    restart: "no"
-    entrypoint: [ "/bin/bash", "-c" ]
-    command: |
-      "
-      echo 'Waiting for Kafka...';
-      until /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list > /dev/null 2>&1; do
-        echo 'Kafka is not ready yet...';
-        sleep 2;
-      done;
-
-      echo 'Kafka is ready. Creating topics...';
-
-      /opt/bitnami/kafka/bin/kafka-topics.sh --create --if-not-exists --topic user-service.user-created --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1;
-      /opt/bitnami/kafka/bin/kafka-topics.sh --create --if-not-exists --topic user-service.user-updated --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1;
-      /opt/bitnami/kafka/bin/kafka-topics.sh --create --if-not-exists --topic user-service.user-deleted --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1;
-      /opt/bitnami/kafka/bin/kafka-topics.sh --create --if-not-exists --topic user-service.user-status-changed --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1;
-
-      echo 'All topics created successfully';
-      "
