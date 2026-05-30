@@ -1,0 +1,20 @@
+services:
+
+  notification-service:
+    container_name: notification-service
+    build:
+      context: ../meeting-platform-notification-service
+      dockerfile: Dockerfile
+    environment:
+      SPRING_DOCKER_COMPOSE_ENABLED: "false"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notificationdb
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    ports:
+      - "8083:8083"
+    depends_on:
+      - postgres
+      - kafka
+    networks:
+      - meeting-network
